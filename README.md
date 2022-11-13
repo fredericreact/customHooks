@@ -1,70 +1,342 @@
-# Getting Started with Create React App
+# Customhooks
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Custom hooks are reusable function that contain state logic.
 
-## Available Scripts
+Unlike regular function, custom hooks can use other React Hooks and React state.
 
-In the project directory, you can run:
 
-### `npm start`
+# Create custom Hooks - counter
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Before : 
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+```javascript 
+import { useState, useEffect } from 'react';
+ 
+import Card from './Card';
+import useCounter from '../hooks/use-counter'
+ 
+const ForwardCounter = () => {
+ 
+  useCounter()
+ 
+  const [counter, setCounter] = useState(0);
+ 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCounter((prevCounter) => prevCounter + 1);
+    }, 1000);
+ 
+    return () => clearInterval(interval);
+  }, []);
+ 
+  return <Card>{counter}</Card>;
+};
+ 
+export default ForwardCounter;
+```
 
-### `npm test`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+The name of the custom hooks must start with ‘use’.
 
-### `npm run build`
+Then return the state.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```javascript
+import {useState, useEffect} from 'react'
+ 
+const useCounter = () => {
+    const [counter, setCounter] = useState(0);
+ 
+    useEffect(() => {
+      const interval = setInterval(() => {
+        setCounter((prevCounter) => prevCounter + 1);
+      }, 1000);
+ 
+      return () => clearInterval(interval);
+    }, []);
+ 
+    return counter
+}
+ 
+export default useCounter;
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Then we use the custom hooks, and we can remove the state and the useEffect, so it becomes :
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+```javascript
+import Card from './Card';
+import useCounter from '../hooks/use-counter'
+ 
+const ForwardCounter = () => {
+ 
+  const counter = useCounter()
+ 
+  return <Card>{counter}</Card>;
+};
+ 
+export default ForwardCounter;
+```
 
-### `npm run eject`
+The custom hook is tied to the component where it is used (incl. The state and effect in the custom hook), it is not shared accord components.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+# Create custom Hooks - Http request
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Before : 
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+GET Request
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+```javascript
+import React, { useEffect, useState } from 'react';
+ 
+import Tasks from './components/Tasks/Tasks';
+import NewTask from './components/NewTask/NewTask';
+ 
+function App() {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [tasks, setTasks] = useState([]);
+ 
+  const fetchTasks = async (taskText) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        'https://react-http-26861-default-rtdb.firebaseio.com/tasks.json'
+      );
+ 
+      if (!response.ok) {
+        throw new Error('Request failed!');
+      }
+ 
+      const data = await response.json();
+ 
+      const loadedTasks = [];
+ 
+      for (const taskKey in data) {
+        loadedTasks.push({ id: taskKey, text: data[taskKey].text });
+      }
+ 
+      setTasks(loadedTasks);
+    } catch (err) {
+      setError(err.message || 'Something went wrong!');
+    }
+    setIsLoading(false);
+  };
+ 
+  useEffect(() => {
+    fetchTasks();
+  }, []);
+ 
+  const taskAddHandler = (task) => {
+    setTasks((prevTasks) => prevTasks.concat(task));
+  };
+ 
+  return (
+    <React.Fragment>
+      <NewTask onAddTask={taskAddHandler} />
+      <Tasks
+        items={tasks}
+        loading={isLoading}
+        error={error}
+        onFetch={fetchTasks}
+      />
+    </React.Fragment>
+  );
+}
+ 
+export default App;
+ 
+```
 
-## Learn More
+POST request
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+```javascript
+import { useState } from 'react';
+ 
+import Section from '../UI/Section';
+import TaskForm from './TaskForm';
+ 
+const NewTask = (props) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+ 
+  const enterTaskHandler = async (taskText) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(
+        'https://react-http-26861-default-rtdb.firebaseio.com/tasks.json',
+        {
+          method: 'POST',
+          body: JSON.stringify({ text: taskText }),
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+ 
+      if (!response.ok) {
+        throw new Error('Request failed!');
+      }
+ 
+      const data = await response.json();
+ 
+      const generatedId = data.name; // firebase-specific => "name" contains generated id
+      const createdTask = { id: generatedId, text: taskText };
+ 
+      props.onAddTask(createdTask);
+    } catch (err) {
+      setError(err.message || 'Something went wrong!');
+    }
+    setIsLoading(false);
+  };
+ 
+  return (
+    <Section>
+      <TaskForm onEnterTask={enterTaskHandler} loading={isLoading} />
+      {error && <p>{error}</p>}
+    </Section>
+  );
+};
+ 
+export default NewTask;
+ 
+```
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## After 
 
-### Code Splitting
+Custom Hook
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+```javascript
+import {useState, useCallback} from 'react'
 
-### Analyzing the Bundle Size
+const useHttp = () => {
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+  
+    const sendRequest = useCallback(async (requestConfig, applyData) => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+            requestConfig.url, {
+                method: requestConfig.method ? requestConfig.method : 'GET',
+                headers: requestConfig.headers ? requestConfig.headers : {},
+                body: requestConfig.body ? JSON.stringify(requestConfig.body) : null
+            }
+        );
+  
+        if (!response.ok) {
+          throw new Error('Request failed!');
+        }
+  
+        const data = await response.json();
+        applyData(data)
+       
+      } catch (err) {
+        setError(err.message || 'Something went wrong!');
+      }
+      setIsLoading(false);
+    },[]);
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+    return {
+        isLoading: isLoading,
+        error: error,
+        sendRequest: sendRequest,
+    }
+}
 
-### Making a Progressive Web App
+export default useHttp;
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+GET request
 
-### Advanced Configuration
+```javascript
+import React, { useEffect, useState } from 'react';
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+import Tasks from './components/Tasks/Tasks';
+import NewTask from './components/NewTask/NewTask';
+import useHttp from './hooks/use-http';
 
-### Deployment
+function App() {
+  const [tasks, setTasks] = useState([]);
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
 
-### `npm run build` fails to minify
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+  const {isLoading, error, sendRequest: fetchTasks} = useHttp();
+
+  useEffect(() => {
+    const transformTasks = (tasksObj) => {
+      const loadedTasks = [];
+  
+        for (const taskKey in tasksObj) {
+          loadedTasks.push({ id: taskKey, text: tasksObj[taskKey].text });
+        }
+  
+        setTasks(loadedTasks);
+    }
+
+    fetchTasks({url: 'https://react-http-26861-default-rtdb.firebaseio.com/tasks.json'}
+    ,transformTasks);
+  }, [fetchTasks]);
+
+  const taskAddHandler = (task) => {
+    setTasks((prevTasks) => prevTasks.concat(task));
+  };
+
+  return (
+    <React.Fragment>
+      <NewTask onAddTask={taskAddHandler} />
+      <Tasks
+        items={tasks}
+        loading={isLoading}
+        error={error}
+        onFetch={fetchTasks}
+      />
+    </React.Fragment>
+  );
+}
+
+export default App;
+
+```
+
+POST request
+
+```javascript
+import Section from '../UI/Section';
+import TaskForm from './TaskForm';
+import useHttp from '../../hooks/use-http';
+
+const NewTask = (props) => {
+  const {isLoading, error, sendRequest: sendTaskRequest} = useHttp();
+ 
+  const createTask = (taskText, taskData) => {
+    const generatedId = taskData.name; // firebase-specific => "name" contains generated id
+      const createdTask = { id: generatedId, text: taskText };
+
+      props.onAddTask(createdTask);
+  }
+
+  const enterTaskHandler = async (taskText) => {
+    sendTaskRequest({
+      url:  'https://react-http-26861-default-rtdb.firebaseio.com/tasks.json',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: { text: taskText }
+    }, createTask.bind(null,taskText) );
+
+  };
+
+  return (
+    <Section>
+      <TaskForm onEnterTask={enterTaskHandler} loading={isLoading} />
+      {error && <p>{error}</p>}
+    </Section>
+  );
+};
+
+export default NewTask;
+
+```
